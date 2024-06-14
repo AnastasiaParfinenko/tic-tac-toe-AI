@@ -1,23 +1,19 @@
 # # size = int(input('Size of field?'))
 #
-# def create_list(state, size = 3):
-#     state_list = [[0] * size for _ in range(size)]
-#     for i in range(size):
-#         for j in range(size):
-#             if state[i * size + j] == '_':
-#                 state_list[i][j] = ' '
-#             else:
-#                 state_list[i][j] = state[i * size + j]
-#     return state_list
-#
-# def illustrate(state_table, size = 3):
-#     print('---' * size)
-#     for i in range(size):
-#         print('|', end=' ')
-#         for j in range(size):
-#             print(state_table[i][j], end=' ')
-#         print('|')
-#     print('---' * size)
+def create_table(state, size=3):
+    global count_moves
+
+    state_table = [[' '] * size for _ in range(size)]
+
+    for i in range(size):
+        for j in range(size):
+            if state[i * size + j] == '_':
+                state_table[i][j] = ' '
+            else:
+                state_table[i][j] = state[i * size + j]
+                count_moves += 1
+
+    return state_table
 #
 #
 # def win(state, symbol):
@@ -59,16 +55,7 @@
 #             return True
 #         else:
 #             print('This cell is occupied! Choose another one!')
-#
-# state = input()
-# state_table = create_list(state)
-# illustrate(state_table)
-#
-# coordinates = input()
-# while not move(coordinates):
-#     coordinates = input()
-#
-#
+
 
 def illustrate(state_table, size=3):
     print('---' * size)
@@ -109,24 +96,28 @@ def win(state_table, symbol):
     return False
 
 
-state_table = [[' '] * 3 for _ in range(3)]
+count_moves = 0
+state_table = create_table(input('Enter the cells: '))
 illustrate(state_table)
 
 game = True
-count = 0
 
 while game:
-    for symbol in ['X', 'O']:
-        coordinates = input(f"{symbol}'s turn: ")
-        while not move(coordinates, symbol):
-            coordinates = input()
-        count += 1
+    symbol = 'X' if count_moves % 2 == 0 else 'O'
+    coordinates = input('Enter the coordinates: ')
+    while not move(coordinates, symbol):
+        coordinates = input('Enter the coordinates: ')
+    count_moves += 1
 
-        won = win(state_table, symbol)
-        if won or count == 3 ** 2:
-            if won:
-                print(f'{symbol} wins!')
-            else:
-                print('Draw!')
-            game = False
-            break
+    won = win(state_table, symbol)
+    if won or count_moves == 3 ** 2:
+        if won:
+            print(f'{symbol} wins')
+        else:
+            print('Draw')
+        game = False
+        break
+    else:
+        print('Game not finished')
+        game = False
+        break
