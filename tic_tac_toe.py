@@ -16,7 +16,10 @@ class GameState:
 
 
 class User:
-    name = 'User'
+    name = 'user'
+
+    def __init__(self, symbol):
+        self.symbol = symbol
 
     def move(self):
         while True:
@@ -35,16 +38,50 @@ class User:
 
 
 class Easy:
-    name = 'Easy'
+    name = 'easy'
 
-    def move(self):
-        import random
+    def __init__(self, symbol):
+        self.symbol = symbol
+
+    def ai_thinking(self):
         import time
 
-        print('Making move level "easy"')
+        print(f'Making move level "{self.name}"')
         time.sleep(0.9)
 
+    def easy_coordinates(self):
+        import random
+
         return random.choice(game.free_cells)
+
+    def move(self):
+        self.ai_thinking()
+        return self.easy_coordinates()
+
+
+class Medium(Easy):
+    name = 'medium'
+
+    def search_win(self, state_table, symbol):
+        for i, j in game.free_cells:
+            state_table[i - 1][j - 1] = symbol
+            if win(state_table, symbol):
+                state_table[i - 1][j - 1] = ' '
+                return i, j
+            else:
+                state_table[i - 1][j - 1] = ' '
+
+    def medium_coordinates(self):
+        other_symbol = next(s for s in symbols if s != self.symbol)
+
+        win_medium = self.search_win(game.state_table, self.symbol)
+        not_lose_medium = self.search_win(game.state_table, other_symbol)
+
+        return win_medium or not_lose_medium or self.easy_coordinates()
+
+    def move(self):
+        self.ai_thinking()
+        return self.medium_coordinates()
 
 
 def illustrate(state_table):
@@ -87,6 +124,10 @@ def win(state_table, symbol):
     return horizontals or verticals or diagonal1 or diagonal2
 
 
+def create_player(name, symbol):
+    return available_players[name](symbol)
+
+
 def first_command():
     import sys
 
@@ -100,13 +141,13 @@ def first_command():
         if len(command) == 3 and command[0] == 'start':
             names = command[1:3]
             if all(n in available_players for n in names):
-                return [available_players[n] for n in names]
+                return list(map(create_player, names, symbols))
 
         print('Bad parameters!')
 
 
 SIZE = 3
-available_players = {'user': User(), 'easy': Easy()}
+available_players = {'user': User, 'easy': Easy, 'medium': Medium}
 symbols = ['X', 'O']
 
 
@@ -119,10 +160,8 @@ if __name__ == '__main__':
         illustrate(game.state_table)
 
         while game.on:
-            # TODO: introduce symbol as an attribute of player
-            assert len(players) == len(symbols) == 2
+            assert len(players) == 2
             player = players[game.count_moves % len(players)]
-            symbol = symbols[game.count_moves % len(symbols)]
 
             coordinates = player.move()
-            game.on = check_move(coordinates, symbol)
+            game.on = check_move(coordinates, player.symbol)
