@@ -1,3 +1,6 @@
+import copy
+import random
+
 class GameState:
     def __init__(self):
         self.on = True
@@ -42,6 +45,7 @@ class Easy:
 
     def __init__(self, symbol):
         self.symbol = symbol
+        self.coordinates = [10, 10]
 
     def ai_thinking(self):
         import time
@@ -50,9 +54,8 @@ class Easy:
         time.sleep(0.9)
 
     def easy_coordinates(self):
-        import random
-
         return random.choice(game.free_cells)
+
 
     def move(self):
         self.ai_thinking()
@@ -82,6 +85,56 @@ class Medium(Easy):
     def move(self):
         self.ai_thinking()
         return self.medium_coordinates()
+
+
+class Hard(Easy):
+    name = 'hard'
+
+    def end_game(self, state_table, free_cells):
+        x_win = win(state_table, 'X')
+        o_win = win(state_table, 'O')
+        draw = len(free_cells) == 0
+
+        if x_win or o_win or draw:
+            return True
+
+        return False
+
+    def score(self, state_table, free_cells, depth):
+        if win(state_table, self.symbol):
+            return POINTS
+        if len(free_cells) == 0:
+            return 0
+
+        return depth - POINTS
+
+    def minimax(self, state_table, free_cells, depth):
+        if self.end_game(state_table, free_cells):
+            return self.score(state_table, free_cells, depth)
+
+        scores = []
+
+        for cell in free_cells:
+            state_table[cell[0] - 1][cell[1] - 1] = symbols[(len(free_cells) + 1) % 2]
+            copy_free_cells = free_cells.copy()
+            copy_free_cells.remove(cell)
+            scores.append(self.minimax(state_table, copy_free_cells, depth + 1))
+            state_table[cell[0] - 1][cell[1] - 1] = ' '
+
+        if symbols[(len(free_cells) + 1) % 2] == player.symbol:
+            max_score = max(scores)
+        else:
+            max_score = min(scores)
+
+        max_index = scores.index(max_score)
+        self.coordinates = free_cells[max_index]
+
+        return max_score
+
+    def move(self):
+        self.ai_thinking()
+        self.minimax(game.state_table, game.free_cells, 0)
+        return self.coordinates
 
 
 def illustrate(state_table):
@@ -147,7 +200,8 @@ def first_command():
 
 
 SIZE = 3
-available_players = {'user': User, 'easy': Easy, 'medium': Medium}
+POINTS = 10
+available_players = {'user': User, 'easy': Easy, 'medium': Medium, 'hard': Hard}
 symbols = ['X', 'O']
 
 
@@ -155,12 +209,15 @@ if __name__ == '__main__':
 
     while True:
         game = GameState()
-        players = first_command()  # start user easy
+        players = first_command()
+
+        # game.state_table = [['O', 'X', 'X'], [' ', 'O', ' '], [' ', ' ', ' ']]
+        # game.free_cells = [[i + 1, j + 1] for i in range(3) for j in range(3) if game.state_table[i][j] == ' ']
+        # game.count_moves = SIZE ** 2 - len(game.free_cells)
 
         illustrate(game.state_table)
 
         while game.on:
-            assert len(players) == 2
             player = players[game.count_moves % len(players)]
 
             coordinates = player.move()
