@@ -17,12 +17,61 @@ class GameState:
         else:
             return ' '
 
+    def illustrate(self):
+        print('---' * SIZE)
+        for i in range(SIZE):
+            print('|', end=' ')
+            for j in range(SIZE):
+                print(self.state_table[i][j], end=' ')
+            print('|')
+        print('---' * SIZE)
 
-class User:
-    name = 'user'
+    def win(self, symbol):
+        horizontals = any(all(self.state_table[i][j] == symbol for j in range(SIZE)) for i in range(SIZE))
+        verticals = any(all(self.state_table[i][j] == symbol for i in range(SIZE)) for j in range(SIZE))
+        diagonal1 = all(self.state_table[i][i] == symbol for i in range(SIZE))
+        diagonal2 = all(self.state_table[i][SIZE - i - 1] == symbol for i in range(SIZE))
+
+        return horizontals or verticals or diagonal1 or diagonal2
+
+    def check_move(self, coordinates, symbol):
+        x, y = coordinates
+        self.state_table[x - 1][y - 1] = symbol
+        self.free_cells.remove([x, y])
+
+        self.illustrate()
+
+        won = self.win(symbol)
+        if won or len(self.free_cells) == 0:
+            if won:
+                print(f'{symbol} wins')
+            else:
+                print('Draw')
+
+            return False
+
+        return True
+
+
+class Player:
+    name = 'player'
 
     def __init__(self, symbol):
         self.symbol = symbol
+        self.state_table = []
+        self.free_cells = []
+
+    def win(self, symbol):
+        horizontals = any(all(self.state_table[i][j] == symbol for j in range(SIZE)) for i in range(SIZE))
+        verticals = any(all(self.state_table[i][j] == symbol for i in range(SIZE)) for j in range(SIZE))
+        diagonal1 = all(self.state_table[i][i] == symbol for i in range(SIZE))
+        diagonal2 = all(self.state_table[i][SIZE - i - 1] == symbol for i in range(SIZE))
+
+        return horizontals or verticals or diagonal1 or diagonal2
+
+
+class User(Player):
+    name = 'user'
 
     def move(self):
         while True:
@@ -34,20 +83,17 @@ class User:
             else:
                 if not (x in range(1, SIZE + 1) and y in range(1, SIZE + 1)):
                     print(f'Coordinates should be from 1 to {SIZE}!')
-                elif game.state_table[x - 1][y - 1] != ' ':
+                elif self.state_table[x - 1][y - 1] != ' ':
                     print('This cell is occupied! Choose another one!')
                 else:
                     return x, y
 
 
-class Easy:
+class Easy(Player):
     name = 'easy'
 
-    def __init__(self, symbol):
-        self.symbol = symbol
-
     def coordinates(self):
-        return random.choice(game.free_cells)
+        return random.choice(self.free_cells)
 
     def move(self):
         print(f'Making move level "{self.name}"')
@@ -67,20 +113,20 @@ class Easy:
 class Medium(Easy):
     name = 'medium'
 
-    def search_win(self, state_table, symbol):
-        for i, j in game.free_cells:
-            state_table[i - 1][j - 1] = symbol
-            if win(state_table, symbol):
-                state_table[i - 1][j - 1] = ' '
+    def search_win(self, symbol):
+        for i, j in self.free_cells:
+            self.state_table[i - 1][j - 1] = symbol
+            if self.win(symbol):
+                self.state_table[i - 1][j - 1] = ' '
                 return i, j
             else:
-                state_table[i - 1][j - 1] = ' '
+                self.state_table[i - 1][j - 1] = ' '
 
     def coordinates(self):
         other_symbol = next(s for s in symbols if s != self.symbol)
 
-        win_medium = self.search_win(game.state_table, self.symbol)
-        not_lose_medium = self.search_win(game.state_table, other_symbol)
+        win_medium = self.search_win(self.symbol)
+        not_lose_medium = self.search_win(other_symbol)
 
         return win_medium or not_lose_medium or random.choice(game.free_cells)
 
@@ -88,39 +134,39 @@ class Medium(Easy):
 class Hard(Easy):
     name = 'hard'
 
-    def end_game(self, state_table, free_cells):
-        x_win = win(state_table, 'X')
-        o_win = win(state_table, 'O')
-        draw = len(free_cells) == 0
+    def end_game(self):
+        x_win = self.win('X')
+        o_win = self.win('O')
+        draw = len(self.free_cells) == 0
 
         if x_win or o_win or draw:
             return True
 
         return False
 
-    def score(self, state_table, depth):
-        if win(state_table, self.symbol):
+    def score(self, depth):
+        if self.win(self.symbol):
             return POINTS
 
         other_symbol = next(s for s in symbols if s != self.symbol)
-        if win(state_table, other_symbol):
+        if self.win(other_symbol):
             return depth - POINTS
 
         return 0
 
-    def minimax(self, state_table, free_cells, depth):
-        if self.end_game(state_table, free_cells):
-            return self.score(state_table, depth), None
+    def minimax(self, free_cells, depth):
+        if self.end_game():
+            return self.score(depth), None
 
         scores = []
 
         for cell in free_cells:
-            state_table[cell[0] - 1][cell[1] - 1] = symbols[(len(free_cells) + 1) % 2]
+            self.state_table[cell[0] - 1][cell[1] - 1] = symbols[(len(free_cells) + 1) % 2]
             copy_free_cells = free_cells.copy()
             copy_free_cells.remove(cell)
-            cur_scores, _ = self.minimax(state_table, copy_free_cells, depth + 1)
-            scores.append(cur_scores)
-            state_table[cell[0] - 1][cell[1] - 1] = ' '
+            cur_score, _ = self.minimax(copy_free_cells, depth + 1)
+            scores.append(cur_score)
+            self.state_table[cell[0] - 1][cell[1] - 1] = ' '
 
         if symbols[(len(free_cells) + 1) % 2] == player.symbol:
             max_score = max(scores)
@@ -133,46 +179,8 @@ class Hard(Easy):
         return max_score, coords
 
     def coordinates(self):
-        _, coords = self.minimax(game.state_table, game.free_cells, 0)
+        _, coords = self.minimax(self.free_cells, 0)
         return coords
-
-
-def illustrate(state_table):
-    print('---' * SIZE)
-    for i in range(SIZE):
-        print('|', end=' ')
-        for j in range(SIZE):
-            print(state_table[i][j], end=' ')
-        print('|')
-    print('---' * SIZE)
-
-
-def check_move(coordinates, symbol):
-    x, y = coordinates
-    game.state_table[x - 1][y - 1] = symbol
-    game.free_cells.remove([x, y])
-
-    illustrate(game.state_table)
-
-    won = win(game.state_table, symbol)
-    if won or len(game.free_cells) == 0:
-        if won:
-            print(f'{symbol} wins')
-        else:
-            print('Draw')
-
-        return False
-
-    return True
-
-
-def win(state_table, symbol):
-    horizontals = any(all(state_table[i][j] == symbol for j in range(SIZE)) for i in range(SIZE))
-    verticals = any(all(state_table[i][j] == symbol for i in range(SIZE)) for j in range(SIZE))
-    diagonal1 = all(state_table[i][i] == symbol for i in range(SIZE))
-    diagonal2 = all(state_table[i][SIZE - i - 1] == symbol for i in range(SIZE))
-
-    return horizontals or verticals or diagonal1 or diagonal2
 
 
 def create_player(name, symbol):
@@ -208,14 +216,48 @@ if __name__ == '__main__':
     while True:
         game = GameState()
         players = first_command()
+        for player in players:
+            player.state_table = game.state_table
+            player.free_cells = game.free_cells
 
-        # game.state_table = [['X', ' ', 'X'], ['X', 'O', 'O'], ['O', ' ', 'X']]
-        # game.free_cells = [[i + 1, j + 1] for i in range(3) for j in range(3) if game.state_table[i][j] == ' ']
-
-        illustrate(game.state_table)
+        game.illustrate()
 
         while game.on:
             player = players[(len(game.free_cells) + 1) % 2]
 
             coordinates = player.move()
-            game.on = check_move(coordinates, player.symbol)
+            game.on = game.check_move(coordinates, player.symbol)
+
+# random_numbers = random.choices(list(range(-10 ** 6, 10 ** 6)), k=100)
+#
+# errors = []
+#
+# if True:
+#     for i in random_numbers:
+#         random.seed(i)
+#
+#         game = GameState()
+#         players = [Medium('X'), Hard('O')]
+#
+#         while game.on:
+#             player = players[(len(game.free_cells) + 1) % 2]
+#
+#             coordinates = player.move()
+#             game.on = check_move(coordinates, player.symbol)
+#
+#         if win(game.state_table, 'X'):
+#             errors.append(i)
+#
+#     print(errors)
+# else:
+#     random.seed(606989)
+#
+#     game = GameState()
+#     players = [Medium('X'), Hard('O')]
+#
+#     while game.on:
+#         player = players[(len(game.free_cells) + 1) % 2]
+#
+#         coordinates = player.move()
+#         game.on = check_move(coordinates, player.symbol)
+#
