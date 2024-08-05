@@ -134,10 +134,10 @@ class Medium(Easy):
 class Hard(Easy):
     name = 'hard'
 
-    def end_game(self):
+    def end_game(self, free_cells):
         x_win = self.win('X')
         o_win = self.win('O')
-        draw = len(self.free_cells) == 0
+        draw = len(free_cells) == 0
 
         if x_win or o_win or draw:
             return True
@@ -146,7 +146,7 @@ class Hard(Easy):
 
     def score(self, depth):
         if self.win(self.symbol):
-            return POINTS
+            return POINTS - depth
 
         other_symbol = next(s for s in symbols if s != self.symbol)
         if self.win(other_symbol):
@@ -155,7 +155,7 @@ class Hard(Easy):
         return 0
 
     def minimax(self, free_cells, depth):
-        if self.end_game():
+        if self.end_game(free_cells):
             return self.score(depth), None
 
         scores = []
@@ -203,6 +203,15 @@ def first_command():
                 return list(map(create_player, names, symbols))
 
         print('Bad parameters!')
+
+
+def create_list(state):
+    state_list = [[' '] * SIZE for _ in range(SIZE)]
+    for i in range(SIZE):
+        for j in range(SIZE):
+            if state[i * SIZE + j] != '_':
+                state_list[i][j] = state[i * SIZE + j]
+    return state_list
 
 
 SIZE = 3
