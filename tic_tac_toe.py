@@ -7,15 +7,41 @@ class GameState:
         self.on = True
         self.state_table = [[' '] * SIZE for _ in range(SIZE)]
         self.free_cells = [[i + 1, j + 1] for i in range(SIZE) for j in range(SIZE)]
+        self.running = True
 
-    def put(self, cell_x, cell_y, symbol):
-        self.state_table[cell_x][cell_y] = symbol
+    def put(self, coords, symbol):
+        x, y = coords
+        self.state_table[x - 1][y - 1] = symbol
+        self.free_cells.remove([x, y])
 
     def get(self, cell_x, cell_y):
         if 0 <= cell_x < SIZE and 0 <= cell_y < SIZE:
             return self.state_table[cell_x][cell_y]
         else:
             return ' '
+
+    def print_result(self):
+        if self.win('O'):
+            print('O wins')
+        elif self.win('X'):
+            print('X wins')
+        elif len(self.free_cells) == 0:
+            print('Draw')
+
+    def win(self, symbol):
+        horizontals = any(all(self.state_table[i][j] == symbol for j in range(SIZE)) for i in range(SIZE))
+        verticals = any(all(self.state_table[i][j] == symbol for i in range(SIZE)) for j in range(SIZE))
+        diagonal1 = all(self.state_table[i][i] == symbol for i in range(SIZE))
+        diagonal2 = all(self.state_table[i][SIZE - i - 1] == symbol for i in range(SIZE))
+
+        return horizontals or verticals or diagonal1 or diagonal2
+
+    def check_move(self, symbol):
+        won = self.win(symbol)
+        if won or len(self.free_cells) == 0:
+            return False
+
+        return True
 
     def illustrate(self):
         print('---' * SIZE)
@@ -26,38 +52,17 @@ class GameState:
             print('|')
         print('---' * SIZE)
 
-    def win(self, symbol):
-        horizontals = any(all(self.state_table[i][j] == symbol for j in range(SIZE)) for i in range(SIZE))
-        verticals = any(all(self.state_table[i][j] == symbol for i in range(SIZE)) for j in range(SIZE))
-        diagonal1 = all(self.state_table[i][i] == symbol for i in range(SIZE))
-        diagonal2 = all(self.state_table[i][SIZE - i - 1] == symbol for i in range(SIZE))
-
-        return horizontals or verticals or diagonal1 or diagonal2
-
-    def check_move(self, coords, symbol):
-        x, y = coords
-        self.state_table[x - 1][y - 1] = symbol
-        self.free_cells.remove([x, y])
-
-        self.illustrate()
-
-        won = self.win(symbol)
-        if won or len(self.free_cells) == 0:
-            if won:
-                print(f'{symbol} wins')
-            else:
-                print('Draw')
-
-            return False
-
-        return True
-
     def play(self, players):
         while self.on:
             player = players[(len(self.free_cells) + 1) % 2]
 
-            coordinates = player.move()
-            self.on = self.check_move(coordinates, player.symbol)
+            coordinates = player.get_coords()
+            self.put(coordinates, player.symbol)
+
+            if self.running:
+                self.illustrate()
+
+            self.on = self.check_move(player.symbol)
 
 
 class Player:
@@ -66,6 +71,18 @@ class Player:
     def __init__(self, symbol, game):
         self.symbol = symbol
         self.game = game
+
+    def move(self):
+        raise NotImplementedError('Please Implement this method')
+
+    def calc_coords(self):
+        raise NotImplementedError('Please Implement this method')
+
+    def get_coords(self):
+        if self.game.running:
+            return self.move()
+        else:
+            return self.calc_coords()
 
 
 class User(Player):
@@ -90,21 +107,21 @@ class User(Player):
 class Easy(Player):
     name = 'easy'
 
-    def coordinates(self):
+    def calc_coords(self):
         return random.choice(self.game.free_cells)
 
     def move(self):
         print(f'Making move level "{self.name}"')
 
         start_time = time.monotonic()
-        coords = self.coordinates()
+
+        coords = self.calc_coords()
         finish_time = time.monotonic()
 
         thinking_time = finish_time - start_time
         sleep_time = 0.9
         if thinking_time < sleep_time:
             time.sleep(sleep_time - thinking_time)
-
         return coords
 
 
@@ -120,7 +137,7 @@ class Medium(Easy):
             else:
                 self.game.state_table[i - 1][j - 1] = ' '
 
-    def coordinates(self):
+    def calc_coords(self):
         other_symbol = next(s for s in symbols if s != self.symbol)
 
         win_medium = self.search_win(self.symbol)
@@ -176,7 +193,7 @@ class Hard(Easy):
 
         return max_score, coords
 
-    def coordinates(self):
+    def calc_coords(self):
         _, coords = self.minimax(self.game.free_cells, 0)
         return coords
 
@@ -228,6 +245,8 @@ def main():
         game.illustrate()
 
         game.play(players)
+
+        game.print_result()
 
 
 if __name__ == '__main__':
