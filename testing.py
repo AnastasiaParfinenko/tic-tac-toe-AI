@@ -3,19 +3,19 @@ import traceback
 
 import tic_tac_toe
 
-random_numbers = [random.randint(-10 ** 6, 10 ** 6) for _ in range(3)]
+random_numbers = [random.randint(-10 ** 6, 10 ** 6) for _ in range(100)]
 
 for i in random_numbers:
     random.seed(i)
 
     try:
         game = tic_tac_toe.GameState()
-        game.running = False
-        players = [tic_tac_toe.Medium('X', game), tic_tac_toe.Medium('O', game)]
+        game.interactive = False
+        players = [tic_tac_toe.Hard('X', game), tic_tac_toe.Medium('O', game)]
 
         game.play(players)
 
-        if game.win('O'):
+        if game.check_win('O'):
             raise ValueError("hard lost")
 
     except Exception:

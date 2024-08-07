@@ -4,31 +4,24 @@ import time
 
 class GameState:
     def __init__(self):
-        self.on = True
         self.state_table = [[' '] * SIZE for _ in range(SIZE)]
-        self.free_cells = [[i + 1, j + 1] for i in range(SIZE) for j in range(SIZE)]
-        self.running = True
+        self.free_cells = [(i + 1, j + 1) for i in range(SIZE) for j in range(SIZE)]
+        self.interactive = True
 
     def put(self, coords, symbol):
         x, y = coords
         self.state_table[x - 1][y - 1] = symbol
-        self.free_cells.remove([x, y])
-
-    def get(self, cell_x, cell_y):
-        if 0 <= cell_x < SIZE and 0 <= cell_y < SIZE:
-            return self.state_table[cell_x][cell_y]
-        else:
-            return ' '
+        self.free_cells.remove(coords)
 
     def print_result(self):
-        if self.win('O'):
+        if self.check_win('O'):
             print('O wins')
-        elif self.win('X'):
+        elif self.check_win('X'):
             print('X wins')
         elif len(self.free_cells) == 0:
             print('Draw')
 
-    def win(self, symbol):
+    def check_win(self, symbol):
         horizontals = any(all(self.state_table[i][j] == symbol for j in range(SIZE)) for i in range(SIZE))
         verticals = any(all(self.state_table[i][j] == symbol for i in range(SIZE)) for j in range(SIZE))
         diagonal1 = all(self.state_table[i][i] == symbol for i in range(SIZE))
@@ -36,12 +29,12 @@ class GameState:
 
         return horizontals or verticals or diagonal1 or diagonal2
 
-    def check_move(self, symbol):
-        won = self.win(symbol)
-        if won or len(self.free_cells) == 0:
-            return False
+    def is_end(self):
+        x_win = self.check_win('X')
+        o_win = self.check_win('O')
+        draw = len(self.free_cells) == 0
 
-        return True
+        return x_win or o_win or draw
 
     def illustrate(self):
         print('---' * SIZE)
@@ -53,16 +46,20 @@ class GameState:
         print('---' * SIZE)
 
     def play(self, players):
-        while self.on:
+        if self.interactive:
+            self.illustrate()
+
+        while not self.is_end():
             player = players[(len(self.free_cells) + 1) % 2]
 
             coordinates = player.get_coords()
             self.put(coordinates, player.symbol)
 
-            if self.running:
+            if self.interactive:
                 self.illustrate()
 
-            self.on = self.check_move(player.symbol)
+        if self.interactive:
+            self.print_result()
 
 
 class Player:
@@ -79,7 +76,7 @@ class Player:
         raise NotImplementedError('Please Implement this method')
 
     def get_coords(self):
-        if self.game.running:
+        if self.game.interactive:
             return self.move()
         else:
             return self.calc_coords()
@@ -114,7 +111,6 @@ class Easy(Player):
         print(f'Making move level "{self.name}"')
 
         start_time = time.monotonic()
-
         coords = self.calc_coords()
         finish_time = time.monotonic()
 
@@ -131,7 +127,7 @@ class Medium(Easy):
     def search_win(self, symbol):
         for i, j in self.game.free_cells:
             self.game.state_table[i - 1][j - 1] = symbol
-            if self.game.win(symbol):
+            if self.game.check_win(symbol):
                 self.game.state_table[i - 1][j - 1] = ' '
                 return i, j
             else:
@@ -149,52 +145,52 @@ class Medium(Easy):
 class Hard(Easy):
     name = 'hard'
 
-    def end_game(self, free_cells):
-        x_win = self.game.win('X')
-        o_win = self.game.win('O')
-        draw = len(free_cells) == 0
-
-        if x_win or o_win or draw:
-            return True
-
-        return False
-
     def score(self, depth):
-        if self.game.win(self.symbol):
+        if self.game.check_win(self.symbol):
             return POINTS - depth
 
         other_symbol = next(s for s in symbols if s != self.symbol)
-        if self.game.win(other_symbol):
+        if self.game.check_win(other_symbol):
             return depth - POINTS
 
         return 0
 
-    def minimax(self, free_cells, depth):
-        if self.end_game(free_cells):
+    def minimax(self, depth):
+        if self.game.is_end():
             return self.score(depth), None
 
         scores = []
 
-        for cell in free_cells:
-            self.game.state_table[cell[0] - 1][cell[1] - 1] = symbols[(len(free_cells) + 1) % 2]
-            copy_free_cells = free_cells.copy()
-            copy_free_cells.remove(cell)
-            cur_score, _ = self.minimax(copy_free_cells, depth + 1)
+        free_cells_original = self.game.free_cells
+        for cell in free_cells_original:
+            self.game.state_table[cell[0] - 1][cell[1] - 1] = symbols[(len(free_cells_original) + 1) % 2]
+
+            new_free_cells = free_cells_original.copy()
+            new_free_cells.remove(cell)
+            self.game.free_cells = new_free_cells
+
+            cur_score, _ = self.minimax(depth + 1)
             scores.append(cur_score)
+
+            self.game.free_cells = free_cells_original
             self.game.state_table[cell[0] - 1][cell[1] - 1] = ' '
 
-        if symbols[(len(free_cells) + 1) % 2] == self.symbol:
+        if symbols[(len(free_cells_original) + 1) % 2] == self.symbol:
             max_score = max(scores)
         else:
             max_score = min(scores)
 
         max_indices = [idx for idx in range(len(scores)) if scores[idx] == max_score]
-        coords = free_cells[random.choice(max_indices)]
+        coords = free_cells_original[random.choice(max_indices)]
 
         return max_score, coords
 
     def calc_coords(self):
-        _, coords = self.minimax(self.game.free_cells, 0)
+        if len(self.game.free_cells) == 9:
+            coords = random.choice(self.game.free_cells)
+        else:
+            _, coords = self.minimax(0)
+
         return coords
 
 
@@ -242,11 +238,7 @@ def main():
         game = GameState()
         players = first_command(game)
 
-        game.illustrate()
-
         game.play(players)
-
-        game.print_result()
 
 
 if __name__ == '__main__':
